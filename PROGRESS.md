@@ -2,6 +2,24 @@
 
 > Live log of what's shipped, what's next, and why. One entry per working session. Newest on top.
 
+## 2026-04-18 · Day 3.5 — CI hardening (green build)
+
+**Shipped:**
+- Integration CI went from 0/10 to 10/10 after three separate root causes:
+  1. `RuntimeError: got Future attached to a different loop` — `pytest-asyncio` auto mode spawns a fresh event loop per test, but the session-scoped engine's pooled asyncpg connections stay bound to the first loop. Switched engine fixture to `NullPool` + per-test instantiation; schema creation gated by a module-level flag so it still runs once.
+  2. `MissingGreenlet: greenlet_spawn has not been called` on every `OrderRead` serialization — Pydantic's `from_attributes=True` tried to lazy-load `order.items` inside a sync validator. Added `selectinload(Order.items)` to `get`, `get_by_idempotency_key`, and `list_page`.
+  3. Same error on `updated_at` after `PUT /status` — the server-side `onupdate=func.now()` marks the attribute as expired post-flush. Explicit `session.refresh(order, attribute_names=["updated_at"])` in `update_status` so serialization stays sync.
+- Docker build: `python:3.12-slim` no longer ships bare `pip` on PATH, and `pip install --prefix=/install --upgrade pip` self-destructed the builder by moving the new pip out of `PYTHONPATH`. Switched to `python -m ensurepip` + `python -m pip install --prefix=/install ...` without the self-upgrade step.
+
+**Decisions locked:**
+- **Integration tests will not share a connection pool across tests.** `NullPool` is the default for any async DB test suite here. Pool reuse across event loops is a category of bug we don't debug twice.
+- **Every endpoint that returns an ORM row must either use an eager-loaded query or refresh the touched columns before serialization.** Relationship + server-generated columns are the two failure modes; the repo is the right place to own both.
+- **Ruff format runs in CI and fails the build.** Local `ruff format` is not optional before pushing.
+
+**Not yet:** same as Day 3.
+
+---
+
 ## 2026-04-18 · Day 3 — Resilience + observability
 
 **Shipped:**
