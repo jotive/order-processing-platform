@@ -29,7 +29,30 @@ Production-grade order processing backend. Not a CRUD exercise: each architectur
 
 ## Architecture
 
-> Diagram pending — will ship with first milestone.
+```mermaid
+flowchart LR
+    Client([Client]) -->|HTTPS/JSON| RL[Rate Limiter<br/>Token bucket · Lua]
+    RL --> API[FastAPI<br/>/api/v1]
+    API -->|SQLAlchemy 2.0 async| PG[(PostgreSQL 16<br/>orders + order_items)]
+    API -->|cache-aside · TTL 5min| Cache[(Redis 7)]
+    RL -.atomic counters.-> Cache
+    API -->|structured logs| Logs[(stdout → collector)]
+    PG -->|migrations| Alembic[Alembic]
+
+    classDef store fill:#0b5,stroke:#062,color:#fff
+    classDef infra fill:#248,stroke:#124,color:#fff
+    class PG,Cache store
+    class RL,Alembic infra
+```
+
+**Request flow:**
+
+1. Rate limiter (Redis token bucket, Lua-atomic) permits or rejects with `429 + Retry-After`.
+2. Handler validates + enforces idempotency via `Idempotency-Key` header + unique DB constraint.
+3. Read path: cache-aside on `order:{id}`, miss falls back to Postgres.
+4. Write path: transactional DB update → cache invalidation *after* commit → 200/201 response.
+
+See [`/docs/adr/`](./docs/adr/) for the trade-off analysis behind each of these choices.
 
 ---
 
