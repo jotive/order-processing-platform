@@ -8,6 +8,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 TEST_DB_URL = os.environ.get(
     "TEST_DATABASE_URL",
@@ -15,17 +16,26 @@ TEST_DB_URL = os.environ.get(
 )
 
 
-@pytest_asyncio.fixture(scope="session")
-async def engine():
-    engine = create_async_engine(TEST_DB_URL, echo=False)
-    from app.db.base import Base
-    from app.models import Order, OrderItem  # noqa: F401
+_schema_ready = False
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    await engine.dispose()
+
+@pytest_asyncio.fixture
+async def engine():
+    # NullPool: pytest-asyncio gives each test a fresh event loop. Any connection
+    # pooled from a prior test is bound to a dead loop and blows up with
+    # "Future attached to a different loop" on the next reuse.
+    global _schema_ready
+    eng = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
+    if not _schema_ready:
+        from app.db.base import Base
+        from app.models import Order, OrderItem  # noqa: F401
+
+        async with eng.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+        _schema_ready = True
+    yield eng
+    await eng.dispose()
 
 
 @pytest_asyncio.fixture
