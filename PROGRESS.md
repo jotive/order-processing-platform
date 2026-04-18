@@ -2,6 +2,38 @@
 
 > Live log of what's shipped, what's next, and why. One entry per working session. Newest on top.
 
+## 2026-04-18 · Day 2 — Endpoints wired end-to-end
+
+**Shipped:**
+- Schema ↔ ORM alignment: orders carry `sku`/`name`/`unit_price`/`currency`/`total_amount` — items are snapshots at purchase time, not live references (prevents historical orders from drifting if product catalog changes).
+- `app/core/pagination.py`: versioned cursor codec (`v1:<urlsafe-b64-json>`) over `(created_at, id)`. Decode rejects malformed tokens and unknown versions.
+- `app/services/order_repository.py`: repository pattern. Create flushes atomically and surfaces idempotency collisions as `OrderConflict`. List uses keyset filter (`created_at < cursor.created_at OR (=, id < cursor.id)`), fetches `size+1` to compute `next_cursor`. Status transitions enforced by explicit `_TRANSITIONS` graph.
+- `app/db/redis.py`: `IdempotencyStore` with SHA-256 of request body + `SET NX EX 86400`. Same key + same payload returns cached order; same key + different payload is 409.
+- `app/api/v1/dependencies.py`: `AsyncSession` commit/rollback wrapper, Redis singleton, repo injection.
+- Endpoints wired: `POST` (idempotent with race-safe fallback), `GET` list (cursor), `GET /{id}`, `PUT /{id}/status`, `DELETE /{id}`.
+- Tests: 19 unit tests green — cursor roundtrip + malformed-token rejection, status transition matrix (10 parametrized cases + terminal-state invariant), idempotency hash stability.
+- CI: GitHub Actions — ruff check + ruff format + pytest unit + Docker build (cached via `type=gha`).
+
+**Decisions locked:**
+- Order items are **snapshots**, not references. Caught at schema-design time before it became a data migration.
+- Status transitions live in a dedicated graph (`_TRANSITIONS`) — testable as data, not scattered as `if`s across the repo. Invariant: terminal states (`delivered`, `cancelled`) have zero outgoing edges, asserted in tests.
+- Idempotency is enforced at two layers: Redis (fast path) + DB unique constraint (correctness floor). Race between cache-check and insert falls back to reading the cached mapping — no double-charge path exists.
+
+**Not yet:**
+- Integration tests against real Postgres (testcontainers or compose fixture).
+- Redis rate limiting (token bucket) — ADR-004 pending.
+- Read-through cache on `GET /{id}` — ADR-004 pending.
+- Observability: structured logs, Prometheus counters, OTel tracing.
+- Secret rotation in Docker/compose for prod.
+
+**Next session:**
+1. ADR-004: caching + rate limiting strategy.
+2. Token bucket rate limiter middleware over Redis.
+3. Integration test suite against compose-provided Postgres.
+4. Structured JSON logging middleware (correlation IDs).
+
+---
+
 ## 2026-04-18 · Day 1 — Scaffolding + design decisions
 
 **Shipped:**

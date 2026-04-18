@@ -8,7 +8,9 @@ class ProblemDetail(BaseModel):
     title: str = Field(description="Short human-readable summary")
     status: int = Field(description="HTTP status code")
     detail: str | None = Field(default=None, description="Human-readable explanation")
-    instance: str | None = Field(default=None, description="URI reference identifying the occurrence")
+    instance: str | None = Field(
+        default=None, description="URI reference identifying the occurrence"
+    )
 
 
 class ValidationErrorItem(BaseModel):

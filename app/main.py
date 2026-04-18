@@ -14,7 +14,8 @@ app = FastAPI(
     description=(
         "Production-grade order processing backend — part of the "
         "[jotive.dev](https://dev.jotive.com.co) technical portfolio.\n\n"
-        "See [Architecture Decision Records](https://github.com/jotive/order-processing-platform/tree/main/docs/adr) "
+        "See [Architecture Decision Records]"
+        "(https://github.com/jotive/order-processing-platform/tree/main/docs/adr) "
         "for design rationale."
     ),
     contact={"name": "Jotive.dev", "url": "https://dev.jotive.com.co"},

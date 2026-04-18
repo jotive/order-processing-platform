@@ -1,8 +1,9 @@
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class OrderStatus(str, Enum):
@@ -15,15 +16,16 @@ class OrderStatus(str, Enum):
 
 
 class OrderItemCreate(BaseModel):
-    product_id: UUID
-    quantity: int = Field(gt=0, description="Must be positive")
-    unit_price: float = Field(gt=0)
+    sku: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=255)
+    quantity: int = Field(gt=0)
+    unit_price: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
 
 
 class OrderCreate(BaseModel):
     customer_id: UUID
+    currency: str = Field(default="USD", min_length=3, max_length=3)
     items: list[OrderItemCreate] = Field(min_length=1)
-    notes: str | None = None
 
 
 class OrderStatusUpdate(BaseModel):
@@ -31,24 +33,32 @@ class OrderStatusUpdate(BaseModel):
 
 
 class OrderItemRead(BaseModel):
-    product_id: UUID
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    sku: str
+    name: str
     quantity: int
-    unit_price: float
-    subtotal: float
+    unit_price: Decimal
 
 
 class OrderRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     customer_id: UUID
     status: OrderStatus
+    currency: str
+    total_amount: Decimal
     items: list[OrderItemRead]
-    total: float
-    notes: str | None
     created_at: datetime
     updated_at: datetime
 
 
 class PaginatedOrders(BaseModel):
     data: list[OrderRead]
-    next_cursor: str | None = Field(default=None, description="Opaque cursor for next page. Null when no more pages.")
+    next_cursor: str | None = Field(
+        default=None,
+        description="Opaque cursor for next page. Null when no more pages.",
+    )
     size: int
