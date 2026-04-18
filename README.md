@@ -37,13 +37,13 @@ Production-grade order processing backend. Not a CRUD exercise: each architectur
 
 All non-trivial decisions live in [`/docs/adr/`](./docs/adr/).
 
-| ADR | Decision | Trade-off |
+| ADR | Decision | Status |
 |---|---|---|
-| 001 | API versioning via URL path | Explicit vs header-based |
-| 002 | Cursor-based pagination | Robustness vs offset simplicity |
-| 003 | PostgreSQL over MongoDB | Transactional integrity vs flexibility |
-| 004 | Caching strategy for orders | Read-through vs write-through |
-| 005 | Testing pyramid scope | Unit/integration/e2e boundaries |
+| [001](./docs/adr/ADR-001-api-versioning.md) | API versioning via URL path | Accepted |
+| [002](./docs/adr/ADR-002-cursor-pagination.md) | Cursor-based pagination | Accepted |
+| [003](./docs/adr/ADR-003-postgresql-over-mongodb.md) | PostgreSQL over MongoDB | Accepted |
+| 004 | Caching strategy for orders | Pending |
+| 005 | Testing pyramid scope | Pending |
 
 ---
 
@@ -52,12 +52,15 @@ All non-trivial decisions live in [`/docs/adr/`](./docs/adr/).
 ```bash
 # Requirements: Docker Desktop, Python 3.12+
 
-docker compose up -d                  # Postgres + Redis + API
-docker compose exec api alembic upgrade head
-docker compose exec api pytest
+make up                               # builds + starts api + Postgres 16 + Redis 7
+make migrate                          # alembic upgrade head
+make logs                             # tail api logs
+make down                             # stop stack
 ```
 
-API available at `http://localhost:8000`. OpenAPI docs at `/docs`.
+API at `http://localhost:8000`. OpenAPI docs at `/docs`. Liveness probe at `/health`.
+
+See [`PROGRESS.md`](./PROGRESS.md) for the current build log.
 
 ---
 
