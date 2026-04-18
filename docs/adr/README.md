@@ -6,9 +6,9 @@ Living record of non-trivial decisions made in this project. Every ADR follows t
 
 | # | Title | Status |
 |---|---|---|
-| 001 | API versioning strategy | Proposed |
-| 002 | Cursor-based pagination | Proposed |
-| 003 | PostgreSQL over MongoDB | Proposed |
+| [001](./ADR-001-api-versioning.md) | API versioning via URL path | Accepted |
+| [002](./ADR-002-cursor-pagination.md) | Cursor-based pagination | Accepted |
+| 003 | PostgreSQL over MongoDB | Pending |
 | 004 | Caching strategy | Pending |
 | 005 | Testing pyramid scope | Pending |
 
