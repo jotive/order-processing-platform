@@ -42,7 +42,7 @@ All non-trivial decisions live in [`/docs/adr/`](./docs/adr/).
 | [001](./docs/adr/ADR-001-api-versioning.md) | API versioning via URL path | Accepted |
 | [002](./docs/adr/ADR-002-cursor-pagination.md) | Cursor-based pagination | Accepted |
 | [003](./docs/adr/ADR-003-postgresql-over-mongodb.md) | PostgreSQL over MongoDB | Accepted |
-| 004 | Caching strategy for orders | Pending |
+| [004](./docs/adr/ADR-004-caching-and-rate-limiting.md) | Caching + rate limiting via Redis | Accepted |
 | 005 | Testing pyramid scope | Pending |
 
 ---

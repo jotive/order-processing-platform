@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -5,8 +7,24 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.router import api_v1_router
 from app.core.config import get_settings
+from app.core.logging import configure_logging
+from app.core.rate_limit import TokenBucketLimiter
+from app.db.redis import get_redis
+from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.request_context import RequestContextMiddleware
 
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    configure_logging()
+    redis = get_redis()
+    limiter = TokenBucketLimiter(redis)
+    app.state.limiter = limiter
+    yield
+    await redis.aclose()
+
 
 app = FastAPI(
     title="Order Processing Platform",
@@ -20,7 +38,12 @@ app = FastAPI(
     ),
     contact={"name": "Jotive.dev", "url": "https://dev.jotive.com.co"},
     license_info={"name": "MIT"},
+    lifespan=lifespan,
 )
+
+# Order matters: context first (so logs carry request_id), then rate limit.
+app.add_middleware(RequestContextMiddleware)
+app.add_middleware(RateLimitMiddleware, limiter=TokenBucketLimiter(get_redis()))
 
 app.include_router(api_v1_router)
 

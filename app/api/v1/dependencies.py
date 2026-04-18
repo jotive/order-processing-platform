@@ -5,6 +5,7 @@ from fastapi import Depends
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import OrderCache
 from app.db.base import AsyncSessionLocal
 from app.db.redis import IdempotencyStore, get_redis
 from app.services.order_repository import OrderRepository
@@ -36,6 +37,13 @@ def idempotency_store(
     return IdempotencyStore(redis)
 
 
+def order_cache(
+    redis: Annotated[Redis, Depends(redis_client)],
+) -> OrderCache:
+    return OrderCache(redis)
+
+
 DbSession = Annotated[AsyncSession, Depends(db_session)]
 OrderRepoDep = Annotated[OrderRepository, Depends(order_repo)]
 IdempotencyStoreDep = Annotated[IdempotencyStore, Depends(idempotency_store)]
+OrderCacheDep = Annotated[OrderCache, Depends(order_cache)]

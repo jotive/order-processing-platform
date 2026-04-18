@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Query, status
 
-from app.api.v1.dependencies import IdempotencyStoreDep, OrderRepoDep
+from app.api.v1.dependencies import IdempotencyStoreDep, OrderCacheDep, OrderRepoDep
 from app.core.pagination import Cursor, InvalidCursor
 from app.schemas.errors import ProblemDetail
 from app.schemas.order import (
@@ -82,7 +82,8 @@ async def create_order(
         return OrderRead.model_validate(existing)
 
     await idem.put(idempotency_key, payload_hash, str(order.id))
-    return OrderRead.model_validate(order)
+    result = OrderRead.model_validate(order)
+    return result
 
 
 @router.get(
@@ -124,12 +125,17 @@ async def list_orders(
     responses={404: {"model": ProblemDetail, "description": "Order not found"}},
     summary="Get order by ID",
 )
-async def get_order(order_id: UUID, repo: OrderRepoDep) -> OrderRead:
+async def get_order(order_id: UUID, repo: OrderRepoDep, cache: OrderCacheDep) -> OrderRead:
+    cached = await cache.get(order_id)
+    if cached is not None:
+        return cached
     try:
         order = await repo.get(order_id)
     except OrderNotFound as e:
         raise HTTPException(status_code=404, detail="Order not found") from e
-    return OrderRead.model_validate(order)
+    result = OrderRead.model_validate(order)
+    await cache.set(result)
+    return result
 
 
 @router.put(
@@ -146,7 +152,10 @@ async def get_order(order_id: UUID, repo: OrderRepoDep) -> OrderRead:
     ),
 )
 async def update_order_status(
-    order_id: UUID, body: OrderStatusUpdate, repo: OrderRepoDep
+    order_id: UUID,
+    body: OrderStatusUpdate,
+    repo: OrderRepoDep,
+    cache: OrderCacheDep,
 ) -> OrderRead:
     try:
         order = await repo.update_status(order_id, body.status)
@@ -154,6 +163,7 @@ async def update_order_status(
         raise HTTPException(status_code=404, detail="Order not found") from e
     except InvalidStatusTransition as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
+    await cache.invalidate(order_id)
     return OrderRead.model_validate(order)
 
 
@@ -166,10 +176,11 @@ async def update_order_status(
     },
     summary="Cancel order",
 )
-async def cancel_order(order_id: UUID, repo: OrderRepoDep) -> None:
+async def cancel_order(order_id: UUID, repo: OrderRepoDep, cache: OrderCacheDep) -> None:
     try:
         await repo.cancel(order_id)
     except OrderNotFound as e:
         raise HTTPException(status_code=404, detail="Order not found") from e
     except InvalidStatusTransition as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
+    await cache.invalidate(order_id)

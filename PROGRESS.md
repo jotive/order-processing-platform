@@ -2,6 +2,37 @@
 
 > Live log of what's shipped, what's next, and why. One entry per working session. Newest on top.
 
+## 2026-04-18 · Day 3 — Resilience + observability
+
+**Shipped:**
+- ADR-004: caching + rate limiting via Redis — full trade-off matrix for cache pattern (cache-aside vs write-through vs write-behind vs TTL-only) and rate algorithm (token bucket vs leaky bucket vs fixed window vs sliding log).
+- `app/core/rate_limit.py`: token bucket over Redis, state updated atomically via Lua `EVAL` (no race between concurrent requests from the same client). Fails *open* — Redis unreachable logs a warning and permits the request rather than taking the API down.
+- `app/middleware/rate_limit.py`: FastAPI middleware. Bucket keyed by source IP (swap for auth principal later). Exempt paths: `/health`, `/docs`, `/openapi.json`, `/redoc`. Denies emit RFC 7807 `429` with `Retry-After`.
+- `app/core/cache.py`: `OrderCache` — read-through on `GET /{id}`, explicit invalidation on every mutation (status update, cancel). Net staleness window after commit: zero.
+- `app/core/logging.py` + `app/middleware/request_context.py`: structured JSON logs. Every record carries `request_id` (from `X-Request-ID` header or a generated hex). Echoes back on response. Per-request completion log with status + duration.
+- `app/main.py`: lifespan wires Redis + limiter, order-aware middleware stack (context first so request_id is in scope when rate-limit logs).
+- Integration tests (`tests/integration/`): httpx ASGITransport + compose-provided Postgres. Fake Redis via `AsyncMock` with in-memory dict backing. Coverage: create/retrieve, idempotent replay, conflicting payload, status happy path, invalid transitions, cancel, cursor pagination (55 orders across 6 pages — asserts no duplicates, no gaps), cache invalidation on mutation.
+- CI: new `integration` job with `postgres:16-alpine` service, `pg_isready` healthcheck, gated on schema-creation from SQLAlchemy metadata.
+
+**Decisions locked:**
+- Rate limiter fails **open**, not closed. A Redis outage does not become an API outage — correctness floor (DB unique constraint) still prevents duplicate orders; rate limit is a best-effort defense, not a correctness guarantee.
+- Lua script is loaded once and cached by SHA on the client — `EVALSHA` path after first call.
+- Cache invalidation lives in the handler, not the repository. The repository does not know whether the caller wanted the cache updated; the route owner decides.
+- Integration schema is created via `Base.metadata.create_all` (not Alembic) for speed. Prod path runs Alembic — difference is documented as a known trade-off.
+
+**Not yet:**
+- ADR-005: testing pyramid (unit/integration/e2e boundaries, when to reach for each).
+- OpenTelemetry tracing + Prometheus metrics.
+- Authentication — rate limit client ID is still `request.client.host`.
+- Load test baseline (k6 or Locust) — need a number to defend "100 req/min" with.
+
+**Next session:**
+1. ADR-005: testing pyramid.
+2. OTel tracing with OTLP exporter + Prometheus counter for `orders_created_total` by status.
+3. Stress-test the token bucket with a k6 script — capture p50/p95 latency with and without rate-limit.
+
+---
+
 ## 2026-04-18 · Day 2 — Endpoints wired end-to-end
 
 **Shipped:**
