@@ -1,0 +1,63 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: opp_api
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      API_ENV: local
+      API_LOG_LEVEL: INFO
+      API_PORT: "8000"
+      DATABASE_URL: postgresql+asyncpg://opp:opp@db:5432/opp
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: dev-secret-change-me
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: opp_db
+    environment:
+      POSTGRES_USER: opp
+      POSTGRES_PASSWORD: opp
+      POSTGRES_DB: opp
+    ports:
+      - "5432:5432"
+    volumes:
+      - opp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opp -d opp"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: opp_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - opp_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  opp_pgdata:
+  opp_redisdata:
