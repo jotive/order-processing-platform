@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.pagination import Cursor
 from app.models.order import Order, OrderItem
@@ -82,11 +83,17 @@ class OrderRepository:
         return order
 
     async def get_by_idempotency_key(self, key: str) -> Order | None:
-        stmt = select(Order).where(Order.idempotency_key == key)
+        stmt = (
+            select(Order)
+            .options(selectinload(Order.items))
+            .where(Order.idempotency_key == key)
+        )
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
     async def get(self, order_id: UUID) -> Order:
-        order = await self.session.get(Order, order_id)
+        order = await self.session.get(
+            Order, order_id, options=[selectinload(Order.items)]
+        )
         if order is None:
             raise OrderNotFound(str(order_id))
         return order
@@ -99,7 +106,11 @@ class OrderRepository:
         customer_id: UUID | None = None,
         status: OrderStatus | None = None,
     ) -> tuple[list[Order], Cursor | None]:
-        stmt = select(Order).order_by(Order.created_at.desc(), Order.id.desc())
+        stmt = (
+            select(Order)
+            .options(selectinload(Order.items))
+            .order_by(Order.created_at.desc(), Order.id.desc())
+        )
 
         if cursor is not None:
             stmt = stmt.where(

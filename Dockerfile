@@ -13,8 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
-RUN pip install --prefix=/install --upgrade pip \
-    && pip install --prefix=/install "fastapi>=0.115" "uvicorn[standard]>=0.32" \
+RUN python -m ensurepip --upgrade \
+    && python -m pip install --prefix=/install --upgrade pip \
+    && python -m pip install --prefix=/install "fastapi>=0.115" "uvicorn[standard]>=0.32" \
         "pydantic>=2.9" "pydantic-settings>=2.6" \
         "sqlalchemy[asyncio]>=2.0" "asyncpg>=0.30" "alembic>=1.14" \
         "redis>=5.2" "python-json-logger>=2.0"
