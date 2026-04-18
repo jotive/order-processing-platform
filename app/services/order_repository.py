@@ -140,6 +140,9 @@ class OrderRepository:
             raise InvalidStatusTransition(order.status, target.value)
         order.status = target.value
         await self.session.flush()
+        # Server-side onupdate marks updated_at as expired post-flush.
+        # Refresh eagerly so downstream Pydantic serialization stays sync.
+        await self.session.refresh(order, attribute_names=["updated_at"])
         return order
 
     async def cancel(self, order_id: UUID) -> Order:
