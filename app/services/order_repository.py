@@ -83,17 +83,11 @@ class OrderRepository:
         return order
 
     async def get_by_idempotency_key(self, key: str) -> Order | None:
-        stmt = (
-            select(Order)
-            .options(selectinload(Order.items))
-            .where(Order.idempotency_key == key)
-        )
+        stmt = select(Order).options(selectinload(Order.items)).where(Order.idempotency_key == key)
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
     async def get(self, order_id: UUID) -> Order:
-        order = await self.session.get(
-            Order, order_id, options=[selectinload(Order.items)]
-        )
+        order = await self.session.get(Order, order_id, options=[selectinload(Order.items)])
         if order is None:
             raise OrderNotFound(str(order_id))
         return order
