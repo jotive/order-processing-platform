@@ -1,19 +1,42 @@
 # Order Processing Platform
 
-> Part of the [jotive.dev](https://dev.jotive.com.co) technical portfolio — Senior Backend Engineer work.
+> Part of the [jotive.dev](https://dev.jotive.com.co) technical portfolio — Backend Engineer · Python · Node.js
 
 Production-grade order processing backend. Not a CRUD exercise: each architectural decision is justified with trade-offs and documented as an Architecture Decision Record (ADR).
 
 ---
 
+## The Problem
+
+**Camila** is CTO at a Colombian e-commerce company. $500k MRR, 8 engineers, peaks during Black Friday.
+
+Every Black Friday, 3–5% of orders duplicate. Customers reload the page while a payment is processing — the charge goes through twice. Her support team spends the following Monday manually issuing refunds. The payment processor charges the same fee regardless. Each campaign that drives more traffic also drives more duplicate charges.
+
+The naive fix is a database unique constraint. That alone fails under concurrent requests: two requests hit the constraint check simultaneously, both pass, both insert. The real fix is a dual-layer approach — atomic Redis check before the DB write, plus the constraint as a safety net.
+
+**This project demonstrates that fix running in production-like conditions.**
+
+---
+
+## What this solves
+
+- Zero duplicate orders regardless of client retries, network glitches, or double-clicks
+- Rate limiting that doesn't allow bursts to bypass the counter (Lua-atomic token bucket)
+- Read path that doesn't hit Postgres on every request (cache-aside with event-based invalidation)
+- Error responses that tell the client exactly what went wrong and how to recover (RFC 7807)
+
+---
+
 ## What this demonstrates
 
-- **API Design:** REST with idempotency keys, cursor pagination, standardized error handling (RFC 7807), versioning strategy
-- **SQL Modeling:** Schema design for transactional integrity, indexes for real query patterns, migration strategy with Alembic
-- **Caching:** Read-through and write-through strategies, TTL and event-based invalidation, Redis as cache vs data store
-- **Observability:** Structured logging, Prometheus metrics, OpenTelemetry-ready
+- **Idempotency:** Dual-layer (Redis atomic check + DB unique constraint) — not just one or the other
+- **Rate limiting:** Token bucket implemented in Lua, executed atomically inside Redis
+- **API Design:** REST with cursor pagination, RFC 7807 errors, versioning strategy
+- **SQL Modeling:** Schema for transactional integrity, indexes for real query patterns, Alembic migrations
+- **Caching:** Read-through and cache-aside strategies, TTL and event-based invalidation
+- **Observability:** Structured JSON logging with correlation IDs, Prometheus metrics, OpenTelemetry-ready
 - **Testing:** Unit, integration, and end-to-end layers with clear separation
-- **Delivery:** Docker multi-stage builds, CI/CD with GitHub Actions, security hardening
+- **Delivery:** Docker multi-stage builds, CI/CD with GitHub Actions
 
 ---
 
@@ -89,7 +112,7 @@ See [`PROGRESS.md`](./PROGRESS.md) for the current build log.
 
 ## Author
 
-**[Jotive.dev](https://dev.jotive.com.co)** — Senior Backend Engineer
+**[Jotive.dev](https://dev.jotive.com.co)** — Backend Engineer · Python · Node.js
 [GitHub](https://github.com/jotive) · [LinkedIn](https://www.linkedin.com/in/jotive/)
 
 ---
